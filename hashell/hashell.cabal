@@ -25,7 +25,10 @@ source-repository head
 
 library
   exposed-modules:
+      Jobs
       Lib
+      Parser
+      RunCommand
   other-modules:
       Paths_hashell
   hs-source-dirs:
@@ -34,6 +37,7 @@ library
   build-depends:
       base >=4.7 && <5
     , isocline
+    , transformers
     , unix
   default-language: Haskell2010
 
@@ -48,6 +52,7 @@ executable hashell-exe
       base >=4.7 && <5
     , hashell
     , isocline
+    , transformers
     , unix
   default-language: Haskell2010
 
@@ -63,5 +68,6 @@ test-suite hashell-test
       base >=4.7 && <5
     , hashell
     , isocline
+    , transformers
     , unix
   default-language: Haskell2010
