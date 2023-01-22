@@ -17,14 +17,14 @@ data ProcessToRun = ProcessToRun {
 }
 
 
-run :: Command -> StateT JobsState IO ()
-run (SingleCommand cmd isBackground) =
+run :: CommandToRun -> StateT JobsState IO ()
+run (CommandToRun (SingleCommand cmd) isBackground) =
         do 
-                liftIO $ putStr "SingleCommand Done"
+                liftIO $ putStr "Command Done"
 
-run (PipelineCommand cmds isBackground) =
-        do
-                liftIO $ putStr "PipelineCommand Done"
+run (CommandToRun (PipelineCommand cmds) isBackground) =
+        do 
+                liftIO $ putStr "Command Done"
 
 
 startProcess :: ProcessToRun -> IO ()

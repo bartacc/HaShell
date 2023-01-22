@@ -1,4 +1,4 @@
-module Jobs (JobsState, Job, Process, ProcState) where
+module Jobs (JobsState, Job, Process, ProcState, initialJobsState) where
 
 import System.Posix (ProcessID, ProcessGroupID)
 
@@ -19,3 +19,6 @@ data Process = Process {
 }
 
 data ProcState = RUNNING | STOPPED | FINISHED
+
+initialJobsState :: JobsState
+initialJobsState = JobsState {jobs = []}
