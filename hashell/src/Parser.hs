@@ -3,6 +3,8 @@ module Parser (CommandWithArgs(..), Command(..), CommandToRun(..), parse) where
 import Data.List ( elemIndex )
 import qualified Data.Text as T
 
+type IsBackground = Bool
+
 data CommandWithArgs = CommandWithArgs {
     cmdName :: String,
     args :: [String],
@@ -17,7 +19,8 @@ data Command =
 
 data CommandToRun = CommandToRun {
     cmd :: Command,
-    isBackground :: Bool
+    cmdString :: String,
+    isBackground :: IsBackground
 } deriving Show
 
 
@@ -28,11 +31,13 @@ parse input =
         Nothing -> 
             CommandToRun {
                 cmd = parseSingleOrPipelineCommand text,
+                cmdString = T.unpack text,
                 isBackground = False
             }
         Just prefix -> 
             CommandToRun {
                 cmd = parseSingleOrPipelineCommand prefix,
+                cmdString = T.unpack text,
                 isBackground = True
             }
     

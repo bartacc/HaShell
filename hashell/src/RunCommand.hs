@@ -3,9 +3,9 @@ module RunCommand where
 import Parser
 import Jobs
 
-import Control.Monad.Trans.State.Lazy
-import Control.Monad.IO.Class
-import System.Posix (Fd, ProcessID)
+import Control.Monad.Trans.State.Lazy ( StateT )
+import Control.Monad.IO.Class ( MonadIO(liftIO) )
+import System.Posix (Fd)
 import System.Console.Isocline (termWriteLn)
 
 data ProcessToRun = ProcessToRun {
@@ -18,11 +18,11 @@ data ProcessToRun = ProcessToRun {
 
 
 run :: CommandToRun -> StateT JobsState IO ()
-run (CommandToRun (SingleCommand cmd) isBackground) =
+run (CommandToRun (SingleCommand cmd) cmdString isBackground) =
         do 
                 liftIO $ putStr "Command Done"
 
-run (CommandToRun (PipelineCommand cmds) isBackground) =
+run (CommandToRun (PipelineCommand cmds) cmdString isBackground) =
         do 
                 liftIO $ putStr "Command Done"
 

@@ -25,6 +25,7 @@ dependencies:
 - isocline
 - transformers
 - text
+- containers
 
 ghc-options:
 - -Wall
