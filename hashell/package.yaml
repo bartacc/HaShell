@@ -26,6 +26,7 @@ dependencies:
 - transformers
 - text
 - containers
+- stm
 
 ghc-options:
 - -Wall

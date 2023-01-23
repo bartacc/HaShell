@@ -38,6 +38,7 @@ library
       base >=4.7 && <5
     , containers
     , isocline
+    , stm
     , text
     , transformers
     , unix
@@ -55,6 +56,7 @@ executable hashell-exe
     , containers
     , hashell
     , isocline
+    , stm
     , text
     , transformers
     , unix
@@ -73,6 +75,7 @@ test-suite hashell-test
     , containers
     , hashell
     , isocline
+    , stm
     , text
     , transformers
     , unix
