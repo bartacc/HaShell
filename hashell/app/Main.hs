@@ -1,6 +1,4 @@
 module Main (main) where
-
-import Lib
 import Control.Monad
 import Data.Maybe
 import System.Posix

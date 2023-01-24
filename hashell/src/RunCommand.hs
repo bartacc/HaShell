@@ -1,7 +1,7 @@
 module RunCommand where
 
 import Parser
-import Jobs
+import JobsState
 
 import Control.Monad.Trans.State.Lazy ( StateT )
 import Control.Monad.IO.Class ( MonadIO(liftIO) )

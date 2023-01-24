@@ -26,8 +26,9 @@ source-repository head
 library
   exposed-modules:
       Jobs
-      Lib
+      JobsState
       Parser
+      ProcState
       RunCommand
   other-modules:
       Paths_hashell
