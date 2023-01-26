@@ -1,4 +1,4 @@
-module Parser (CommandWithArgs(..), Command(..), CommandToRun(..), parse) where
+module Parser (CommandWithArgs(..), Command(..), CommandToRun(..), IsBackground, parse) where
 
 import Data.List ( elemIndex )
 import qualified Data.Text as T
@@ -8,8 +8,8 @@ type IsBackground = Bool
 data CommandWithArgs = CommandWithArgs {
     cmdName :: String,
     args :: [String],
-    inputFilePath :: Maybe String,
-    outputFilePath :: Maybe String
+    inputFilePath :: Maybe FilePath,
+    outputFilePath :: Maybe FilePath
 } deriving Show
 
 data Command = 
@@ -76,7 +76,7 @@ parseCommandWithArgs text =
 -- Input file path (or Nothing)
 -- Output file path (or Nothing)
 -- Command text without redirections
-getInputOutputPaths :: T.Text -> (Maybe String, Maybe String, T.Text)
+getInputOutputPaths :: T.Text -> (Maybe FilePath, Maybe FilePath, T.Text)
 getInputOutputPaths text = 
     let wordsReversed = reverse $ T.words text in
     let maybeInputIdx = elemIndex (T.singleton '<') wordsReversed in
@@ -104,7 +104,7 @@ getInputOutputPaths text =
 
 -- For a reversed list of words in a command and a symbol ('>' or '<'),
 -- return the path corresponding to this symbol (or Nothing) and the remaining words in a command 
-getPath :: [T.Text] -> T.Text -> (Maybe String, [T.Text])
+getPath :: [T.Text] -> T.Text -> (Maybe FilePath, [T.Text])
 getPath wordsReversed symbol = 
     let maybeIdx = elemIndex symbol wordsReversed in
     case maybeIdx of

@@ -1,17 +1,19 @@
-module Jobs(initJobs) where
+module Jobs(initJobs, monitorJob, sigchldMask, setTerminalPgid) where
 
-import JobsState (JobsState (..), Job (pendingSignalsForProcessGroup, pgid), ProcessUpdateInfo, initialJobsState, updateState)
+import JobsState (JobsState (..), Job (pendingSignalsForProcessGroup, pgid), ProcessUpdateInfo, updateState, fgIdx, getFgJob, getFgJobState, moveFGJobToBG)
+import qualified UserMessages
 
 
 import Control.Concurrent.STM
     ( STM, atomically, newTChan, tryReadTChan, writeTChan, TChan )
 import qualified Data.IntMap as IntMap
 import System.Posix
-import ProcState ( processStatusToProcState )
+import ProcState ( processStatusToProcState, ProcState (..) )
 import Control.Monad.IO.Class ( MonadIO(liftIO) ) 
 import Control.Monad ( guard )
 import Control.Concurrent ( yield )
 import Control.Monad.Trans.State (StateT, put, get)
+import System.Console.Isocline (termWriteLn)
 
 sigchldMask :: SignalSet
 sigchldMask = addSignal processStatusChanged emptySignalSet
@@ -22,15 +24,44 @@ sigchldMask = addSignal processStatusChanged emptySignalSet
 --             for WCONTINUED flag in waitpid() :/
 -- killJob
 -- watchJobs 
--- monitorJob
 -- shutdownJobs
 
--- monitorJob :: SignalSet -> StateT JobsState IO ()
--- monitorJob signalSet =
---     do
---         state <- get
---         let fgJob = jobs state IntMap.! fgIdx in
---         setTerminalProcessGroupID 
+setTerminalPgid :: JobsState -> ProcessGroupID -> IO ()
+setTerminalPgid state pgid =
+    do
+        setTerminalProcessGroupID (terminalFd state) pgid
+
+setTerminalPgidToShell :: JobsState -> IO ()
+setTerminalPgidToShell state = 
+    do
+        pgrp <- getProcessGroupID
+        setTerminalPgid state pgrp
+
+monitorJob :: SignalSet -> StateT JobsState IO ()
+monitorJob signalSet =
+    do
+        initialState <- get
+        liftIO $ setTerminalProcessGroupID (terminalFd initialState) (pgid $ getFgJob initialState)
+        waitForFgJobToFinishOrStop
+
+    where 
+        waitForFgJobToFinishOrStop :: StateT JobsState IO ()
+        waitForFgJobToFinishOrStop = 
+            do
+                waitForSigchld signalSet
+                state <- get 
+                let fgJobState = getFgJobState state in
+                    case fgJobState of
+                        STOPPED _ -> do
+                            let (newState, bgJobId) = moveFGJobToBG state
+                            put newState
+                            liftIO $ UserMessages.suspended bgJobId $ getFgJob newState
+                            liftIO $ setTerminalPgidToShell newState
+                        EXITED _ -> liftIO $ setTerminalPgidToShell state
+                        TERMINATED _ -> liftIO $ setTerminalPgidToShell state
+                        _ -> waitForFgJobToFinishOrStop
+                            
+                
 
 
 sigchldHandler :: TChan ProcessUpdateInfo -> IO ()
@@ -44,38 +75,39 @@ sigchldHandler stmChan =
                 sigchldHandler stmChan
 
 
-initJobs :: StateT JobsState IO ()
+initJobs :: IO JobsState
 initJobs = do
-    stmChan <- liftIO $ atomically newTChan
+    stmChan <- atomically newTChan
 
     --    Block SIGINT for the duration of `sigchldHandler`
     --    in case `sigintHandler` does something crazy like `longjmp`.
     let signalMaskToBlock = addSignal keyboardSignal emptySignalSet
-    _ <- liftIO $ installHandler processStatusChanged (Catch $ sigchldHandler stmChan) (Just signalMaskToBlock)
+    _ <- installHandler processStatusChanged (Catch $ sigchldHandler stmChan) (Just signalMaskToBlock)
 
     -- Assume we're running in interactive mode, so move us to foreground.
     -- Duplicate terminal fd, but do not leak it to subprocesses that execve.
-    isTerminal <- liftIO $ queryTerminal stdInput
+    isTerminal <- queryTerminal stdInput
     guard isTerminal 
-    ttyFd <- liftIO $ dup stdInput
-    liftIO $ setFdOption ttyFd CloseOnExec True
+    ttyFd <- dup stdInput
+    setFdOption ttyFd CloseOnExec True
 
-    put initialJobsState {
+    -- Take control of the terminal.
+    pgid <- getProcessGroupID
+    setTerminalProcessGroupID ttyFd pgid
+
+    -- Return initial state of shell
+    return JobsState {
         jobs = IntMap.empty,
         terminalFd = ttyFd,
         stmChannel = stmChan
     }
 
-    -- Take control of the terminal.
-    pgid <- liftIO getProcessGroupID
-    liftIO $ setTerminalProcessGroupID ttyFd pgid
-
 -- Uses sigSuspend to wait for a sigChld.
 -- Then it updates the current state based on the information from sigchldHandler()
-waitForSigchld :: StateT JobsState IO ()
-waitForSigchld =
+waitForSigchld :: SignalSet -> StateT JobsState IO ()
+waitForSigchld signalSet =
     do
-        liftIO $ awaitSignal $ Just sigchldMask -- Wait for a sigChld 
+        liftIO $ awaitSignal $ Just signalSet -- Wait for a sigChld and install old mask (where sigChld is unblocked)
         liftIO yield -- Give a chance for the sighchldHandler to run
 
         initialState <- get

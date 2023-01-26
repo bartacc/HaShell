@@ -3,6 +3,11 @@ import Control.Monad
 import Data.Maybe
 import System.Posix
 import System.Console.Isocline
+import Jobs (initJobs)
+import JobsState (JobsState)
+import Parser (parse)
+import Control.Monad.Trans.State (execStateT)
+import RunCommand (run)
 
 main :: IO ()
 main = do
@@ -10,9 +15,12 @@ main = do
   isAtty <- queryTerminal 0
   guard isAtty
 
-  _ <- createProcessGroupFor 0
+  pid <- getProcessID
+  _ <- createProcessGroupFor pid
 
-    -- TODO: initjobs()
+  initialState <- initJobs
+
+  termWriteLn $ show initialState
 
     -- TODO: 
     --  struct sigaction act = {
@@ -29,18 +37,20 @@ main = do
 
 
   setHistory "history.txt" 200
-  readPrompt
+  readPrompt initialState
 
   termWriteLn "Done"
 
 
-readPrompt :: IO ()
-readPrompt = do 
+readPrompt :: JobsState -> IO ()
+readPrompt state = do 
   maybeLine <- readlineMaybe "$"
   case maybeLine of 
     Nothing -> return () -- TODO: shutdownJobs()
     Just line -> do
       historyAdd line
-      termWriteLn line -- TODO: eval line
+      let parsedCmd = parse line
+      termWriteLn $ show parsedCmd
+      newState <- execStateT (run parsedCmd) state
       -- TODO: watchjobs(FINISHED);
-      readPrompt
+      readPrompt newState

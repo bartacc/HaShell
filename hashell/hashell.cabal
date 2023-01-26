@@ -25,11 +25,14 @@ source-repository head
 
 library
   exposed-modules:
+      BuiltinCommand
       Jobs
       JobsState
       Parser
+      ProcessToRun
       ProcState
       RunCommand
+      UserMessages
   other-modules:
       Paths_hashell
   hs-source-dirs:

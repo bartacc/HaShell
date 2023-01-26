@@ -1,5 +1,6 @@
-module JobsState (JobsState(..), Job(..), Process, ProcState, ProcessUpdateInfo,
- addJob, delJob, moveFGJobToBG, moveBGJobToFG, updateState, initialJobsState, addProc, getJobState, cleanUpFinishedJob, getLastProcState) where
+module JobsState (JobsState(..), Job(..), JobID, Process, ProcState, ProcessUpdateInfo,
+ addJob, delJob, moveFGJobToBG, moveBGJobToFG, updateState,
+ addProc, getJobState, cleanUpFinishedJob, getLastProcState, fgIdx, bgIdx, getFgJob, getFgJobState) where
 
 import ProcState
     ( ProcState(STOPPED, RUNNING),
@@ -57,10 +58,8 @@ data Process = Process {
 } deriving Show
 
 ----------------------------- Public functions ---------------------------
-initialJobsState :: JobsState 
-initialJobsState = JobsState {
-    jobs = IntMap.empty
-}
+getFgJob :: JobsState -> Job
+getFgJob state = jobs state IntMap.! fgIdx
 
 addJob :: JobsState -> ProcessGroupID -> Bool -> String -> (JobsState, JobID)
 addJob state pgid isBackground cmdString =
@@ -82,12 +81,12 @@ delJob state idx =
         state {jobs = IntMap.delete idx allJobs}
 
 
-moveFGJobToBG :: JobsState -> JobsState
+moveFGJobToBG :: JobsState -> (JobsState, JobID)
 moveFGJobToBG state = 
     let allJobs = jobs state in
     let fgJob = allJobs IntMap.! fgIdx in
     let stateWithoutFGJob = state {jobs = IntMap.delete fgIdx allJobs} in
-    fst $ insertJob stateWithoutFGJob fgJob True
+    insertJob stateWithoutFGJob fgJob True
 
 
 moveBGJobToFG :: JobsState -> JobID -> JobsState
@@ -108,6 +107,8 @@ addProc state idx pid =
     let newJob = job {processes = processes job ++ [newProcess]} in
     state {jobs = IntMap.insert idx newJob $ jobs state}
 
+getFgJobState :: JobsState -> ProcState
+getFgJobState state = getJobState state fgIdx
 
 getJobState :: JobsState -> JobID -> ProcState
 getJobState state idx = jobState $ jobs state IntMap.! idx 
