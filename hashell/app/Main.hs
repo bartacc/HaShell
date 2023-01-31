@@ -1,6 +1,5 @@
 module Main (main) where
 import Control.Monad
-import Data.Maybe
 import System.Posix
 import System.Console.Isocline
 import Jobs (initJobs)
@@ -8,6 +7,7 @@ import JobsState (JobsState)
 import Parser (parse)
 import Control.Monad.Trans.State (execStateT)
 import RunCommand (run)
+import DebugLogger (debug)
 
 main :: IO ()
 main = do
@@ -20,7 +20,7 @@ main = do
 
   initialState <- initJobs
 
-  termWriteLn $ show initialState
+  debug $ show initialState
 
     -- TODO: 
     --  struct sigaction act = {
@@ -50,7 +50,9 @@ readPrompt state = do
     Just line -> do
       historyAdd line
       let parsedCmd = parse line
-      termWriteLn $ show parsedCmd
+
+      debug $ show parsedCmd
+
       newState <- execStateT (run parsedCmd) state
       -- TODO: watchjobs(FINISHED);
       readPrompt newState

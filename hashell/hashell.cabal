@@ -26,6 +26,7 @@ source-repository head
 library
   exposed-modules:
       BuiltinCommand
+      DebugLogger
       Jobs
       JobsState
       Parser

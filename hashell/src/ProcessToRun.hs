@@ -1,6 +1,6 @@
 module ProcessToRun(ProcessToRun(..), createProcessToRun) where
     
-import System.Posix (Fd, OpenMode (..), OpenFileFlags (..), openFd, stdFileMode, stdInput, stdOutput)
+import System.Posix (Fd, OpenMode (..), OpenFileFlags (..), openFd, stdFileMode)
 import Parser (IsBackground, CommandWithArgs (..), cmdName, args)
 
 data ProcessToRun = ProcessToRun {
@@ -9,7 +9,9 @@ data ProcessToRun = ProcessToRun {
     inputFD :: Fd,  -- By default -1
     outputFD :: Fd, -- By default -1 
     isBackground :: IsBackground
-}
+} deriving Show
+
+
 
 createProcessToRun :: CommandWithArgs -> IsBackground -> IO ProcessToRun
 createProcessToRun cmdWithArgs isBg =
