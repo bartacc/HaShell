@@ -29,13 +29,13 @@ sigchldMask = addSignal processStatusChanged emptySignalSet
 -- shutdownJobs
 
 setTerminalPgid :: JobsState -> ProcessGroupID -> IO ()
-setTerminalPgid state pgid =
+setTerminalPgid state newControllingPgid =
     do
         let ttyFd = terminalFd state
         isValidTerminalFd <- queryTerminal ttyFd
         guard isValidTerminalFd
-        setTerminalProcessGroupID ttyFd pgid
-        debug $ "After setTerminalProcessGroupID ttyFd=" ++ show (terminalFd state) ++ " pgid=" ++ show pgid ++ " isValidTtyFd=" ++ show isValidTerminalFd
+        setTerminalProcessGroupID ttyFd newControllingPgid
+        debug $ "After setTerminalProcessGroupID ttyFd=" ++ show (terminalFd state) ++ " pgid=" ++ show newControllingPgid ++ " isValidTtyFd=" ++ show isValidTerminalFd
 
 setTerminalPgidToShell :: JobsState -> IO ()
 setTerminalPgidToShell state = 
@@ -123,8 +123,8 @@ initJobs = do
     }
 
     -- Take control of the terminal.
-    pgid <- getProcessGroupID
-    setTerminalPgid state pgid
+    shellPgid <- getProcessGroupID
+    setTerminalPgid state shellPgid
 
     -- Return initial state of shell
     return state

@@ -6,7 +6,7 @@ import JobsState ( JobsState, addJob, addProc )
 
 import Control.Monad.Trans.State.Lazy ( StateT, execStateT, get, put )
 import Control.Monad.IO.Class ( MonadIO(liftIO) )
-import System.Posix (Fd, closeFd, executeFile, installHandler, sigCHLD, Handler (Default), sigTSTP, sigTTIN, sigTTOU, sigQUIT, dupTo, setSignalMask, blockSignals, forkProcess, ProcessID, getSignalMask, createProcessGroupFor, SignalSet, addSignal, emptySignalSet, backgroundWrite, stdInput, stdOutput, getProcessID, getEnvironment)
+import System.Posix (Fd, closeFd, executeFile, installHandler, sigCHLD, Handler (Default), sigTSTP, sigTTIN, sigTTOU, sigQUIT, dupTo, setSignalMask, blockSignals, forkProcess, ProcessID, getSignalMask, createProcessGroupFor, SignalSet, addSignal, emptySignalSet, backgroundWrite, stdInput, stdOutput, getProcessID)
 import System.Console.Isocline (termWriteLn)
 import Control.Exception (try, SomeException)
 import Control.Monad
@@ -20,9 +20,9 @@ import DebugLogger (debug)
 run :: CommandToRun -> StateT JobsState IO ()
 -- Execute internal command within shell's process or execute external command
 -- in a subprocess. External command can be run in the background.
-run (CommandToRun (SingleCommand cmd) cmdString isBackground) =
+run (CommandToRun (SingleCommand cmdWithArgs) commandName isBg) =
         do 
-                procToRun <- liftIO $ createProcessToRun cmd isBackground
+                procToRun <- liftIO $ createProcessToRun cmdWithArgs isBg
 
                 liftIO $ debug $ "Run single command - " ++ show procToRun
 
@@ -47,7 +47,7 @@ run (CommandToRun (SingleCommand cmd) cmdString isBackground) =
 
                         debug $ "In child after fork: childPid=" ++ show childPid ++ " childPgid=" ++ show pgid 
 
-                        unless isBackground $ do 
+                        unless isBg $ do 
                                 blockSignals (addSignal backgroundWrite emptySignalSet)
                                 setTerminalPgid state pgid
                                 setSignalMask origSigMask
@@ -74,17 +74,17 @@ run (CommandToRun (SingleCommand cmd) cmdString isBackground) =
                         liftIO $ maybeCloseFd (outputFD procToRun)
 
                         state <- get
-                        let (stateWithJob, jobId) = addJob state childPgid isBackground cmdString 
+                        let (stateWithJob, jobId) = addJob state childPgid isBg commandName 
                         let stateWithProc = addProc stateWithJob jobId childPid
                         put stateWithProc
 
-                        if isBackground then
-                                liftIO $ UserMessages.runningInBackground jobId cmdString
+                        if isBg then
+                                liftIO $ UserMessages.runningInBackground jobId commandName
                         else
                                 monitorJob origSigMask
 
 
-run (CommandToRun (PipelineCommand cmds) cmdString isBackground) =
+run (CommandToRun (PipelineCommand cmdsWithArgs) commandName isBg) =
         do 
                 liftIO $ termWriteLn "Command Done"
 
