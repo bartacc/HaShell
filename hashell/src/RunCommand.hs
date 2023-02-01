@@ -79,7 +79,7 @@ run (CommandToRun (SingleCommand cmdWithArgs) commandName isBg) =
                         put stateWithProc
 
                         if isBg then
-                                liftIO $ UserMessages.runningInBackground jobId commandName
+                                liftIO $ UserMessages.printRunningInBackground jobId commandName
                         else
                                 monitorJob origSigMask
 

@@ -2,12 +2,13 @@ module Main (main) where
 import Control.Monad
 import System.Posix
 import System.Console.Isocline
-import Jobs (initJobs)
+import Jobs (initJobs, watchJobs)
 import JobsState (JobsState)
 import Parser (parse)
 import Control.Monad.Trans.State (execStateT)
 import RunCommand (run)
 import DebugLogger (debug)
+import ProcState (ProcState(EXITED))
 
 main :: IO ()
 main = do
@@ -49,10 +50,11 @@ readPrompt state = do
     Nothing -> return () -- TODO: shutdownJobs()
     Just line -> do
       historyAdd line
+
       let parsedCmd = parse line
-
       debug $ show parsedCmd
+      
+      stateAfterEval <- execStateT (run parsedCmd) state
+      stateAfterWatchJobs <- execStateT (watchJobs True) stateAfterEval
 
-      newState <- execStateT (run parsedCmd) state
-      -- TODO: watchjobs(FINISHED);
-      readPrompt newState
+      readPrompt stateAfterWatchJobs

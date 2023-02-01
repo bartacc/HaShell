@@ -1,4 +1,4 @@
-module JobsState (JobsState(..), Job(..), JobID, Process, ProcState, ProcessUpdateInfo,
+module JobsState (JobsState(..), Job(..), JobID, Process(..), ProcState, ProcessUpdateInfo,
  addJob, delJob, moveFGJobToBG, moveBGJobToFG, updateState,
  addProc, getJobState, cleanUpFinishedJob, getLastProcState, fgIdx, bgIdx, getFgJob, getFgJobState) where
 
