@@ -98,7 +98,7 @@ watchJobs watchOnlyFinished =
                 IntMap.foldlWithKey
                 (\ (curState, curMessage) jobID job -> 
                     let thisJobState = jobState job in
-                    if watchOnlyFinished && not (isFinished thisJobState) then
+                    if jobID == fgIdx || (watchOnlyFinished && not (isFinished thisJobState)) then
                         (curState, curMessage)
                     else
                         let msg = curMessage ++ getMessageBasedOnState jobID (cmdString job) thisJobState in
