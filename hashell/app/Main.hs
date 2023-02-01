@@ -9,6 +9,7 @@ import Control.Monad.Trans.State (execStateT)
 import RunCommand (run)
 import DebugLogger (debug)
 import ProcState (ProcState(EXITED))
+import Data.Char (isSpace)
 
 main :: IO ()
 main = do
@@ -49,12 +50,16 @@ readPrompt state = do
   case maybeLine of 
     Nothing -> return () -- TODO: shutdownJobs()
     Just line -> do
-      historyAdd line
 
-      let parsedCmd = parse line
-      debug $ show parsedCmd
-      
-      stateAfterEval <- execStateT (run parsedCmd) state
-      stateAfterWatchJobs <- execStateT (watchJobs True) stateAfterEval
+      if not $ all isSpace line then do
+        historyAdd line
 
-      readPrompt stateAfterWatchJobs
+        let parsedCmd = parse line
+        debug $ show parsedCmd
+        
+        stateAfterEval <- execStateT (run parsedCmd) state
+        stateAfterWatchJobs <- execStateT (watchJobs True) stateAfterEval
+
+        readPrompt stateAfterWatchJobs
+      else 
+        readPrompt state
