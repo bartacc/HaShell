@@ -1,5 +1,5 @@
 module JobsState (JobsState(..), Job(..), JobID, Process(..), ProcState, ProcessUpdateInfo,
- addJob, delJob, moveFGJobToBG, moveBGJobToFG, updateState,
+ addJob, delJob, moveFGJobToBG, moveBGJobToFG, updateState, removePendingSignalsFromState,
  addProc, getJobState, cleanUpFinishedJob, getLastProcState, fgIdx, bgIdx, getFgJob, getFgJobState) where
 
 import ProcState
@@ -183,6 +183,15 @@ updateState state (procId, newProcState) =
             else
                 curPendingSignals
 
+
+removePendingSignalsFromState :: JobsState -> JobsState
+removePendingSignalsFromState initialState =
+    initialState {
+        jobs = 
+            IntMap.map 
+            (\job -> job {pendingSignalsForProcessGroup = []}) 
+            $ jobs initialState
+    }
 
 -------------------------------- Private functions ------------------------------
 

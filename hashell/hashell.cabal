@@ -33,6 +33,7 @@ library
       ProcessToRun
       ProcState
       RunCommand
+      StmChannelCommunication
       UserMessages
   other-modules:
       Paths_hashell

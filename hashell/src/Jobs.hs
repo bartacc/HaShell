@@ -1,11 +1,11 @@
 module Jobs(initJobs, monitorJob, watchJobs, killJob, resumeJob, sigchldMask, setTerminalPgid) where
 
-import JobsState (JobsState (..), Job (pendingSignalsForProcessGroup, pgid, jobState, cmdString, processes), Process(..), ProcessUpdateInfo, updateState, getFgJob, getFgJobState, moveFGJobToBG, delJob, JobID, fgIdx, moveBGJobToFG)
+import JobsState (JobsState (..), Job (pgid, jobState, cmdString, processes), Process(..), ProcessUpdateInfo, getFgJob, getFgJobState, moveFGJobToBG, delJob, JobID, fgIdx, moveBGJobToFG)
 import qualified UserMessages
 
 
 import Control.Concurrent.STM
-    ( STM, atomically, newTChan, tryReadTChan, writeTChan, TChan, readTChan )
+    ( atomically, newTChan, writeTChan, TChan )
 import qualified Data.IntMap as IntMap
 import System.Posix
 import ProcState ( processStatusToProcState, ProcState (..), isFinished )
@@ -17,16 +17,17 @@ import DebugLogger (debug)
 import Control.Exception (try)
 import Foreign.C (getErrno, eCHILD, throwErrno)
 import UserMessages (getMessageBasedOnState, printMessage, printContinued, printMessageLn)
-import qualified Data.List as List
+import StmChannelCommunication
+    ( updateStateFromChannelBlocking,
+      updateStateFromChannelNonBlocking )
 
 sigchldMask :: SignalSet
 sigchldMask = addSignal processStatusChanged emptySignalSet
 
 -- TODO:
--- resumeJob - after sending SIGCONT update job state to RUNNING. 
---             Can't do that from sigchildHandler, because unix Haskell library doesn't have bindings
---             for WCONTINUED flag in waitpid() :/
 -- shutdownJobs
+
+
 
 resumeJob :: Bool -> JobID -> SignalSet -> StateT JobsState IO ()
 resumeJob isBg jId sigMask = do
@@ -224,75 +225,3 @@ waitForSigchld signalSet jobIdToWaitFor =
         liftIO $ debug "In waitForSigchld received signal"
 
         updateStateFromChannelBlocking jobIdToWaitFor
-
-
-updateStateFromChannelBlocking :: JobID -> StateT JobsState IO ()
-updateStateFromChannelBlocking expectedJobId = do
-    initialState <- get
-    let stmChan = stmChannel initialState
-
-    updateStateFromChannel $ 
-            readChannelItemBlockingUntilJobIdFoundAndUpdateState expectedJobId stmChan initialState
-
-updateStateFromChannelNonBlocking :: StateT JobsState IO ()
-updateStateFromChannelNonBlocking = do
-    initialState <- get
-    let stmChan = stmChannel initialState
-
-    updateStateFromChannel $ readChannelNonBlockingAndUpdateState stmChan initialState
-
-updateStateFromChannel :: STM JobsState -> StateT JobsState IO ()
-updateStateFromChannel stmComputation = do
-    stateAfterChannelRead <- liftIO $ atomically stmComputation
-    liftIO $ debug $ "In updateStateFromChannel read updated state from channel. state=" ++ show stateAfterChannelRead
-
-    liftIO $ sendPendingSignals $ jobs stateAfterChannelRead
-    let finalState = removePendingSignalsFromState stateAfterChannelRead
-    liftIO $ debug $ "In updateStateFromChannel after sending pending signals. state=" ++ show finalState
-
-    put finalState
-
-
--- Read blocking until job with id == expectedJobId appears. Then read the rest non-blocking
-readChannelItemBlockingUntilJobIdFoundAndUpdateState :: JobID -> TChan ProcessUpdateInfo -> JobsState -> STM JobsState
-readChannelItemBlockingUntilJobIdFoundAndUpdateState expectedJobId chan initialState = do
-    (processId, procState) <- readTChan chan
-    let expectedJob = jobs initialState IntMap.! expectedJobId
-    let maybeProcInExpectedJob = List.find (\process -> pid process == processId) $ processes expectedJob
-    let newState = updateState initialState (processId, procState) 
-    
-    case maybeProcInExpectedJob of
-        Nothing ->
-            -- Process which updated its state is NOT the one we have been looking for.
-            -- Try to read the channel blocking again
-            readChannelItemBlockingUntilJobIdFoundAndUpdateState expectedJobId chan newState
-        Just _ ->
-            -- Process which updated its state IS the one we have been looking for.
-            -- Read the rest of the updates from channel non blocking.
-            readChannelNonBlockingAndUpdateState chan newState
-
-
-readChannelNonBlockingAndUpdateState :: TChan ProcessUpdateInfo -> JobsState -> STM JobsState
-readChannelNonBlockingAndUpdateState chan initialState = do
-    maybeUpdateInfo <- tryReadTChan chan
-    case maybeUpdateInfo of 
-        Nothing -> return initialState
-        Just updateInfo ->
-            readChannelNonBlockingAndUpdateState chan $ updateState initialState updateInfo
-
-sendPendingSignals :: IntMap.IntMap Job -> IO ()
-sendPendingSignals =
-    mapM_ 
-    (\job -> 
-        mapM_ 
-        (\sig -> signalProcessGroup sig $ pgid job) 
-        $ pendingSignalsForProcessGroup job)
-
-removePendingSignalsFromState :: JobsState -> JobsState
-removePendingSignalsFromState initialState =
-    initialState {
-        jobs = 
-            IntMap.map 
-            (\job -> job {pendingSignalsForProcessGroup = []}) 
-            $ jobs initialState
-    }

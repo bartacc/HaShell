@@ -8,7 +8,6 @@ import Parser (parse)
 import Control.Monad.Trans.State (execStateT)
 import RunCommand (run)
 import DebugLogger (debug)
-import ProcState (ProcState(EXITED))
 import Data.Char (isSpace)
 
 main :: IO ()
@@ -40,8 +39,6 @@ main = do
 
   setHistory "history.txt" 200
   readPrompt initialState
-
-  termWriteLn "Done"
 
 
 readPrompt :: JobsState -> IO ()
