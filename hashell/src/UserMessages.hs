@@ -1,4 +1,4 @@
-module UserMessages(printMessage, printSuspended, printRunningInBackground, getMessageBasedOnState) where
+module UserMessages(printMessage, printSuspended, printRunningInBackground, printContinued, getMessageBasedOnState) where
 
 import JobsState ( JobID )    
 import System.Console.Isocline (termWrite)
@@ -14,6 +14,9 @@ printSuspended jobID cmdString = printMessage $ suspended jobID cmdString
 
 printRunningInBackground :: JobID -> String -> IO ()
 printRunningInBackground jobID cmdString = printMessage $ runningInBackground jobID cmdString
+
+printContinued :: JobID -> String -> IO ()
+printContinued jobId cmdString = printMessage $ continued jobId cmdString
 
 getMessageBasedOnState :: JobID -> String -> ProcState -> String
 getMessageBasedOnState jobID cmdString jobState =
@@ -35,6 +38,9 @@ killed jobID cmdString signal = showJobIDAndAction jobID cmdString "killed" ++ "
 
 exited :: JobID -> String -> ExitCode -> String
 exited jobID cmdString exitCode = showJobIDAndAction jobID cmdString "exited" ++ " with exit status " ++ show exitCode ++ "\n"
+
+continued :: JobID -> String -> String
+continued jobId cmdString = showJobIDAndAction jobId cmdString "continue"
 
 showJobIDAndAction :: JobID -> String -> String -> String
 showJobIDAndAction jobID cmdString action = "[" ++ show jobID ++ "] " ++ action ++ " '" ++ cmdString ++ "'"

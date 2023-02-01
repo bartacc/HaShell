@@ -1,6 +1,6 @@
-module Jobs(initJobs, monitorJob, watchJobs, killJob, sigchldMask, setTerminalPgid) where
+module Jobs(initJobs, monitorJob, watchJobs, killJob, resumeJob, sigchldMask, setTerminalPgid) where
 
-import JobsState (JobsState (..), Job (pendingSignalsForProcessGroup, pgid, jobState, cmdString, processes), Process(..), ProcessUpdateInfo, updateState, getFgJob, getFgJobState, moveFGJobToBG, delJob, JobID, fgIdx)
+import JobsState (JobsState (..), Job (pendingSignalsForProcessGroup, pgid, jobState, cmdString, processes), Process(..), ProcessUpdateInfo, updateState, getFgJob, getFgJobState, moveFGJobToBG, delJob, JobID, fgIdx, moveBGJobToFG)
 import qualified UserMessages
 
 
@@ -16,7 +16,7 @@ import Control.Monad.Trans.State (StateT, put, get)
 import DebugLogger (debug)
 import Control.Exception (try)
 import Foreign.C (getErrno, eCHILD, throwErrno)
-import UserMessages (getMessageBasedOnState, printMessage)
+import UserMessages (getMessageBasedOnState, printMessage, printContinued)
 import qualified Data.List as List
 
 sigchldMask :: SignalSet
@@ -26,11 +26,53 @@ sigchldMask = addSignal processStatusChanged emptySignalSet
 -- resumeJob - after sending SIGCONT update job state to RUNNING. 
 --             Can't do that from sigchildHandler, because unix Haskell library doesn't have bindings
 --             for WCONTINUED flag in waitpid() :/
--- killJob
 -- shutdownJobs
 
-killJob :: JobID -> StateT JobsState IO ()
-killJob jobId = do
+resumeJob :: Bool -> JobID -> SignalSet -> StateT JobsState IO ()
+resumeJob isBg jId sigMask = do
+    state <- get
+    let jobMap = jobs state
+
+    if IntMap.null jobMap then do
+        liftIO $ printMessage "There are no jobs in the background\n"
+        return ()
+    else do
+        let jobId = 
+                if jId < 0 then fst $ IntMap.findMax jobMap
+                else jId
+        let job = jobMap IntMap.! jobId
+
+        liftIO $ signalProcessGroup sigCONT $ pgid job
+        liftIO $ printContinued jobId (cmdString job)
+
+        -- After sending SIGCONT, update job state to RUNNING, by sending messages through STM TChan.
+        -- Can't do that from sigchildHandler, because unix Haskell library doesn't have bindings
+        -- for WCONTINUED flag in waitpid() :/
+        let stmChan = stmChannel state
+        liftIO $ atomically $
+            mapM_
+            (writeTChan stmChan)
+            (craftUpdateProcInfo job)
+
+        if isBg then
+            -- Makes sure that shell received SIGCHLD and that job status is updated
+            waitForSigchld sigMask jobId 
+        else do
+            let newState = moveBGJobToFG state jobId
+            put newState
+            monitorJob sigMask
+
+    where
+        craftUpdateProcInfo :: Job -> [ProcessUpdateInfo] 
+        craftUpdateProcInfo job = 
+            map 
+            (\process -> (pid process, RUNNING)) 
+            (processes job)
+
+
+
+killJob :: JobID -> SignalSet -> StateT JobsState IO ()
+killJob jobId _ = do
     state <- get
     let maybeJob = IntMap.lookup jobId $ jobs state
     case maybeJob of 
@@ -102,7 +144,7 @@ monitorJob signalSet =
         waitForFgJobToFinishOrStop = 
             do
                 liftIO $ debug $ "monitorJob before waitForSigchld"
-                waitForSigchld signalSet
+                waitForSigchld signalSet fgIdx
                 liftIO $ debug $ "monitorJob after waitForSigchld"
 
                 state <- get 
@@ -173,15 +215,15 @@ initJobs = do
 
 -- Uses sigSuspend to wait for a sigChld.
 -- Then it updates the current state based on the information from sigchldHandler()
-waitForSigchld :: SignalSet -> StateT JobsState IO ()
-waitForSigchld signalSet =
+waitForSigchld :: SignalSet -> JobID -> StateT JobsState IO ()
+waitForSigchld signalSet jobIdToWaitFor =
     do
         liftIO $ awaitSignal $ Just signalSet -- Wait for a sigChld and install old mask (where sigChld is unblocked)
         liftIO yield -- Give a chance for the sighchldHandler to run
 
         liftIO $ debug "In waitForSigchld received signal"
 
-        updateStateFromChannelBlocking fgIdx
+        updateStateFromChannelBlocking jobIdToWaitFor
 
 
 updateStateFromChannelBlocking :: JobID -> StateT JobsState IO ()
@@ -211,17 +253,6 @@ updateStateFromChannel stmComputation = do
     put finalState
 
 
-    
--- This is called after awaitSignal returned, so there is at least one child process which changed state.
--- It waits for that one ProcessUpdateInfo in a TChan in a blocking way (because sigChldHandler might not have yet sent update info to TChan).
--- After this it reads all remaining ProcessUpdateInfo's in a non blocking way (because there might be many process which changed state, we don't know how many) 
-
--- TODO: read blocking until job with id = 0 (foreground job) appears. Then read the rest non-blocking 
--- readChannelAndUpdateState :: TChan ProcessUpdateInfo -> JobsState -> STM JobsState
--- readChannelAndUpdateState chan initialState = do
---     stateAfterFirstUpdate <- readChannelItemBlockingAndUpdateState chan initialState
---     readChannelNonBlockingAndUpdateState chan stateAfterFirstUpdate
-
 -- Read blocking until job with id == expectedJobId appears. Then read the rest non-blocking
 readChannelItemBlockingUntilJobIdFoundAndUpdateState :: JobID -> TChan ProcessUpdateInfo -> JobsState -> STM JobsState
 readChannelItemBlockingUntilJobIdFoundAndUpdateState expectedJobId chan initialState = do
@@ -240,13 +271,6 @@ readChannelItemBlockingUntilJobIdFoundAndUpdateState expectedJobId chan initialS
             -- Read the rest of the updates from channel non blocking.
             readChannelNonBlockingAndUpdateState chan newState
 
-    
-
-
--- readChannelItemBlockingAndUpdateState :: TChan ProcessUpdateInfo -> JobsState -> STM JobsState
--- readChannelItemBlockingAndUpdateState chan initialState = do
---     updateInfo <- readTChan chan
---     return $ updateState initialState updateInfo
 
 readChannelNonBlockingAndUpdateState :: TChan ProcessUpdateInfo -> JobsState -> STM JobsState
 readChannelNonBlockingAndUpdateState chan initialState = do
