@@ -111,7 +111,7 @@ monitorJob signalSet =
                         STOPPED _ -> do
                             let (newState, bgJobId) = moveFGJobToBG state
                             put newState
-                            liftIO $ UserMessages.printSuspended bgJobId $ cmdString $ getFgJob newState
+                            liftIO $ UserMessages.printSuspended bgJobId $ cmdString $ jobs newState IntMap.! bgJobId
                             liftIO $ setTerminalPgidToShell newState
                         EXITED _ -> liftIO $ setTerminalPgidToShell state
                         TERMINATED _ -> liftIO $ setTerminalPgidToShell state
