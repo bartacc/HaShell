@@ -1,10 +1,13 @@
-module UserMessages(printMessage, printSuspended, printRunningInBackground, printContinued, getMessageBasedOnState) where
+module UserMessages(printMessage, printMessageLn, printSuspended, printRunningInBackground, printContinued, getMessageBasedOnState) where
 
 import JobsState ( JobID )    
-import System.Console.Isocline (termWrite)
+import System.Console.Isocline (termWrite, termWriteLn)
 import System.Exit (ExitCode)
 import System.Posix (Signal)
 import ProcState (ProcState(..))
+
+printMessageLn :: String -> IO ()
+printMessageLn = termWriteLn
 
 printMessage :: String -> IO ()
 printMessage = termWrite
@@ -40,7 +43,7 @@ exited :: JobID -> String -> ExitCode -> String
 exited jobID cmdString exitCode = showJobIDAndAction jobID cmdString "exited" ++ " with exit status " ++ show exitCode ++ "\n"
 
 continued :: JobID -> String -> String
-continued jobId cmdString = showJobIDAndAction jobId cmdString "continue"
+continued jobId cmdString = showJobIDAndAction jobId cmdString "continue" ++ "\n"
 
 showJobIDAndAction :: JobID -> String -> String -> String
 showJobIDAndAction jobID cmdString action = "[" ++ show jobID ++ "] " ++ action ++ " '" ++ cmdString ++ "'"

@@ -16,7 +16,7 @@ import Control.Monad.Trans.State (StateT, put, get)
 import DebugLogger (debug)
 import Control.Exception (try)
 import Foreign.C (getErrno, eCHILD, throwErrno)
-import UserMessages (getMessageBasedOnState, printMessage, printContinued)
+import UserMessages (getMessageBasedOnState, printMessage, printContinued, printMessageLn)
 import qualified Data.List as List
 
 sigchldMask :: SignalSet
@@ -34,7 +34,7 @@ resumeJob isBg jId sigMask = do
     let jobMap = jobs state
 
     if IntMap.null jobMap then do
-        liftIO $ printMessage "There are no jobs in the background\n"
+        liftIO $ printMessageLn "There are no jobs in the background"
         return ()
     else do
         let jobId = 
@@ -76,7 +76,7 @@ killJob jobId _ = do
     state <- get
     let maybeJob = IntMap.lookup jobId $ jobs state
     case maybeJob of 
-        Nothing -> liftIO $ printMessage $ "Job with id " ++ show jobId ++ " not found"
+        Nothing -> liftIO $ printMessageLn $ "Job with id " ++ show jobId ++ " not found"
         Just job ->
             if isFinished $ jobState job then
                 return ()
