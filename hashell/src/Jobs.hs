@@ -1,4 +1,4 @@
-module Jobs(initJobs, monitorJob, watchJobs, killJob, resumeJob, sigchldMask, setTerminalPgid) where
+module Jobs(initJobs, monitorJob, watchJobs, killJob, resumeJob, shutdownJobs, sigchldMask, setTerminalPgid) where
 
 import JobsState (JobsState (..), Job (pgid, jobState, cmdString, processes), Process(..), ProcessUpdateInfo, getFgJob, getFgJobState, moveFGJobToBG, delJob, JobID, fgIdx, moveBGJobToFG)
 import qualified UserMessages
@@ -24,9 +24,21 @@ import StmChannelCommunication
 sigchldMask :: SignalSet
 sigchldMask = addSignal processStatusChanged emptySignalSet
 
--- TODO:
--- shutdownJobs
+shutdownJobs :: StateT JobsState IO ()
+shutdownJobs = do
+    oldMask <- liftIO getSignalMask
+    liftIO $ blockSignals sigchldMask
 
+    state <- get
+    let allJobIds = IntMap.keys $ jobs state
+    -- Kill remaining jobs and wait for them to finish.
+    mapM_
+        (\jId -> killJob jId oldMask)
+        allJobIds
+
+    watchJobs True
+    liftIO $ setSignalMask oldMask
+    liftIO $ closeFd $ terminalFd state
 
 
 resumeJob :: Bool -> JobID -> SignalSet -> StateT JobsState IO ()

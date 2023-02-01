@@ -2,7 +2,7 @@ module Main (main) where
 import Control.Monad
 import System.Posix
 import System.Console.Isocline
-import Jobs (initJobs, watchJobs)
+import Jobs (initJobs, watchJobs, shutdownJobs)
 import JobsState (JobsState)
 import Parser (parse)
 import Control.Monad.Trans.State (execStateT)
@@ -45,7 +45,9 @@ readPrompt :: JobsState -> IO ()
 readPrompt state = do 
   maybeLine <- readlineMaybe "$"
   case maybeLine of 
-    Nothing -> return () -- TODO: shutdownJobs()
+    Nothing -> do
+      _ <- execStateT shutdownJobs state
+      return ()
     Just line -> do
 
       if not $ all isSpace line then do

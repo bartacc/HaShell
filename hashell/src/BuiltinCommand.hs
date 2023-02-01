@@ -3,18 +3,20 @@ module BuiltinCommand(isBuiltinCmd, runBuiltinCmd) where
 import ProcessToRun (ProcessToRun (cmdName, args))
 import JobsState (JobsState, JobID)
 import Control.Monad.Trans.State (StateT)
-import Jobs (watchJobs, killJob, sigchldMask, resumeJob)
+import Jobs (watchJobs, killJob, sigchldMask, resumeJob, shutdownJobs)
 import UserMessages (printMessage)
 import Control.Monad.IO.Class (MonadIO(liftIO))
 import Text.Read (readMaybe)
-import System.Posix (getSignalMask, blockSignals, setSignalMask, SignalSet)
+import System.Posix (getSignalMask, blockSignals, setSignalMask, SignalSet, exitImmediately)
+import GHC.IO.Exception (ExitCode(ExitSuccess))
 
 builtinCommands :: [(String, [String] -> StateT JobsState IO ())]
 builtinCommands = [
     ("jobs", doJobs),
     ("kill", doKill),
     ("bg", doBg),
-    ("fg", doFg)
+    ("fg", doFg),
+    ("quit", doQuit)
     ]
 
 isBuiltinCmd :: ProcessToRun -> Bool
@@ -30,6 +32,12 @@ runBuiltinCmd procToRun =
         case lookup commandName builtinCommands of
             Nothing -> error $ "Invalid builtin command " ++ commandName
             Just func -> func (args procToRun)
+
+
+doQuit :: [String] -> StateT JobsState IO ()
+doQuit _ = do
+    shutdownJobs
+    liftIO $ exitImmediately ExitSuccess
 
 doBg :: [String] -> StateT JobsState IO ()
 doBg args 
