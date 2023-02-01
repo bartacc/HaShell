@@ -37,7 +37,7 @@ parse input =
         Just prefix -> 
             CommandToRun {
                 cmd = parseSingleOrPipelineCommand prefix,
-                cmdString = T.unpack text,
+                cmdString = T.unpack $ T.strip prefix,
                 isBackground = True
             }
     
