@@ -1,4 +1,4 @@
-module ProcessToRun(ProcessToRun(..), createProcessToRun) where
+module ProcessToRun(ProcessToRun(..), createProcessToRun, overWriteInputOutputFdsIfNonNegative) where
     
 import System.Posix (Fd, OpenMode (..), OpenFileFlags (..), openFd, stdFileMode)
 import Parser (IsBackground, CommandWithArgs (..), cmdName, args)
@@ -12,6 +12,12 @@ data ProcessToRun = ProcessToRun {
 } deriving Show
 
 
+overWriteInputOutputFdsIfNonNegative :: ProcessToRun -> Fd -> Fd -> ProcessToRun
+overWriteInputOutputFdsIfNonNegative procToRun inFd outFd =
+        procToRun {
+                inputFD = if inFd /= -1 then inFd else inputFD procToRun,
+                outputFD = if outFd /= -1 then outFd else outputFD procToRun
+        }
 
 createProcessToRun :: CommandWithArgs -> IsBackground -> IO ProcessToRun
 createProcessToRun cmdWithArgs isBg =
