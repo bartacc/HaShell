@@ -3,17 +3,25 @@ module StmChannelCommunication (
     updateStateFromChannelNonBlocking,
     updateStateFromChannel,
     readChannelItemBlockingUntilJobIdFoundAndUpdateState,
-    readChannelNonBlockingAndUpdateState) where
+    readChannelNonBlockingAndUpdateState,
+    sendProcUpdateInfoToChannel) where
 
 import JobsState (JobID, JobsState (stmChannel, jobs), ProcessUpdateInfo, Job (processes, pgid, pendingSignalsForProcessGroup), removePendingSignalsFromState, Process (pid), updateState)
 import Control.Monad.Trans.State (StateT, get, put)
-import Control.Concurrent.STM (STM, TChan, atomically, readTChan, tryReadTChan)
+import Control.Concurrent.STM (STM, TChan, atomically, readTChan, tryReadTChan, writeTChan)
 import qualified Data.IntMap.Strict as IntMap
 import qualified Data.List as List
 import Control.Monad.IO.Class ( MonadIO(liftIO) )
 import DebugLogger (debug)
 import System.Posix (signalProcessGroup)
 
+sendProcUpdateInfoToChannel :: [ProcessUpdateInfo] -> TChan ProcessUpdateInfo -> STM ()
+sendProcUpdateInfoToChannel procUpdateInfo stmChan = do
+    case procUpdateInfo of 
+        updateInfo : restUpdateInfo -> do
+            writeTChan stmChan updateInfo
+            sendProcUpdateInfoToChannel restUpdateInfo stmChan
+        [] -> return ()
 
 updateStateFromChannelBlocking :: JobID -> StateT JobsState IO ()
 updateStateFromChannelBlocking expectedJobId = do

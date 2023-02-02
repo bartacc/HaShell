@@ -91,8 +91,12 @@ run (CommandToRun (PipelineCommand cmdsWithArgs) commandName isBg) =
                 mask <- liftIO getSignalMask
                 liftIO $ blockSignals sigchldMask 
 
+                liftIO $ debug "Run pipeline command"
+
                 cmdWithPipes <- liftIO createCmdWithPipes
                 newJobId <- startJobWithPipes cmdWithPipes
+
+                liftIO $ debug $ "Created pipeline job with id=" ++ show newJobId
 
                 if isBg then
                         liftIO $ UserMessages.printRunningInBackground newJobId commandName

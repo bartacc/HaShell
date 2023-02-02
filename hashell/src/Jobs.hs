@@ -19,7 +19,7 @@ import Foreign.C (getErrno, eCHILD, throwErrno)
 import UserMessages (getMessageBasedOnState, printMessage, printContinued, printMessageLn)
 import StmChannelCommunication
     ( updateStateFromChannelBlocking,
-      updateStateFromChannelNonBlocking )
+      updateStateFromChannelNonBlocking, sendProcUpdateInfoToChannel )
 
 sigchldMask :: SignalSet
 sigchldMask = addSignal processStatusChanged emptySignalSet
@@ -180,20 +180,27 @@ monitorJob signalSet =
 sigchldHandler :: TChan ProcessUpdateInfo -> IO ()
 sigchldHandler stmChan =
     do
-        result <- try $ getAnyProcessStatus False True :: IO (Either IOError (Maybe (ProcessID, ProcessStatus)))
-        case result of 
-            Left _ -> do
-                errno <- getErrno
-                when (errno /= eCHILD) $
-                    -- If errno == ECHILD then our process doesn't have any children, so we simply end the computation
-                    throwErrno "Error after getAnyProcessStatus in sigchldHandler."
-            Right maybeProcState ->
-                case maybeProcState of
-                    Nothing -> return ()
-                    Just (pid, procState) -> do
-                        debug $ "In sigchldHandler. Received " ++ show (pid, procState)
-                        atomically $ writeTChan stmChan (pid, processStatusToProcState procState)
-                        sigchldHandler stmChan
+        procUpdateInfos <- getAllProcessUpdateInfo []
+        atomically $ sendProcUpdateInfoToChannel procUpdateInfos stmChan
+
+    where
+        getAllProcessUpdateInfo :: [ProcessUpdateInfo] -> IO [ProcessUpdateInfo]
+        getAllProcessUpdateInfo curList = do
+            result <- try $ getAnyProcessStatus False True :: IO (Either IOError (Maybe (ProcessID, ProcessStatus)))
+            case result of 
+                Left _ -> do
+                    errno <- getErrno
+                    when (errno /= eCHILD) $
+                        -- If errno == ECHILD then our process doesn't have any children, so we simply end the computation
+                        throwErrno "Error after getAnyProcessStatus in sigchldHandler."
+                    return curList
+                Right maybeProcState ->
+                    case maybeProcState of
+                        Nothing -> return curList
+                        Just (pid, procState) -> do
+                            debug $ "In sigchldHandler. Received " ++ show (pid, procState)
+                            getAllProcessUpdateInfo $ curList ++ [(pid, processStatusToProcState procState)]
+
 
 
 initJobs :: IO JobsState
