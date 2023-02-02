@@ -6,8 +6,7 @@ import JobsState ( JobsState (jobs), addJob, addProc, Job (pgid), JobID )
 
 import Control.Monad.Trans.State.Lazy ( StateT, execStateT, get, put )
 import Control.Monad.IO.Class ( MonadIO(liftIO) )
-import System.Posix (Fd, closeFd, executeFile, installHandler, sigCHLD, Handler (Default), sigTSTP, sigTTIN, sigTTOU, sigQUIT, dupTo, setSignalMask, blockSignals, forkProcess, ProcessID, getSignalMask, createProcessGroupFor, SignalSet, addSignal, emptySignalSet, backgroundWrite, stdInput, stdOutput, getProcessID, createPipe, ProcessGroupID, joinProcessGroup, setProcessGroupIDOf)
-import System.Console.Isocline (termWriteLn)
+import System.Posix (Fd, closeFd, executeFile, installHandler, sigCHLD, Handler (Default), sigTSTP, sigTTIN, sigTTOU, sigQUIT, dupTo, setSignalMask, blockSignals, forkProcess, ProcessID, getSignalMask, createProcessGroupFor, SignalSet, addSignal, emptySignalSet, backgroundWrite, stdInput, stdOutput, getProcessID, createPipe, ProcessGroupID, setProcessGroupIDOf)
 import Control.Exception (try, SomeException)
 import Control.Monad
 import ProcessToRun (ProcessToRun(..), createProcessToRun, overWriteInputOutputFdsIfNonNegative)
@@ -16,7 +15,6 @@ import Jobs (sigchldMask, setTerminalPgid, monitorJob)
 import qualified UserMessages
 import DebugLogger (debug)
 import qualified Data.IntMap as IntMap
-import UserMessages (printMessageLn)
 import qualified Data.List as List
 import Data.Maybe (fromJust)
 
