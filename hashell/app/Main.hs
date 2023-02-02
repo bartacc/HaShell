@@ -2,13 +2,14 @@ module Main (main) where
 import Control.Monad
 import System.Posix
 import System.Console.Isocline
-import Jobs (initJobs, watchJobs, shutdownJobs)
+import Jobs (initJobs, watchJobs)
 import JobsState (JobsState)
 import Parser (parse)
 import Control.Monad.Trans.State (execStateT)
 import RunCommand (run)
 import DebugLogger (debug)
 import Data.Char (isSpace)
+import BuiltinCommand (doQuit)
 
 main :: IO ()
 main = do
@@ -46,7 +47,7 @@ readPrompt state = do
   maybeLine <- readlineMaybe "$"
   case maybeLine of 
     Nothing -> do
-      _ <- execStateT shutdownJobs state
+      _ <- execStateT (doQuit []) state
       return ()
     Just line -> do
 
