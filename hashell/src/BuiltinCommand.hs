@@ -1,4 +1,4 @@
-module BuiltinCommand(isBuiltinCmd, runBuiltinCmd) where
+module BuiltinCommand(isBuiltinCmd, runBuiltinCmd, doQuit) where
     
 import ProcessToRun (ProcessToRun (cmdName, args))
 import JobsState (JobsState, JobID)
@@ -7,7 +7,7 @@ import Jobs (watchJobs, killJob, sigchldMask, resumeJob, shutdownJobs)
 import UserMessages (printMessage)
 import Control.Monad.IO.Class (MonadIO(liftIO))
 import Text.Read (readMaybe)
-import System.Posix (getSignalMask, blockSignals, setSignalMask, SignalSet, exitImmediately)
+import System.Posix (getSignalMask, blockSignals, setSignalMask, SignalSet, exitImmediately, getEnv, changeWorkingDirectory)
 import GHC.IO.Exception (ExitCode(ExitSuccess))
 
 builtinCommands :: [(String, [String] -> StateT JobsState IO ())]
@@ -16,6 +16,7 @@ builtinCommands = [
     ("kill", doKill),
     ("bg", doBg),
     ("fg", doFg),
+    ("cd", doChdir),
     ("quit", doQuit)
     ]
 
@@ -33,6 +34,17 @@ runBuiltinCmd procToRun =
             Nothing -> error $ "Invalid builtin command " ++ commandName
             Just func -> func (args procToRun)
 
+doChdir :: [String] -> StateT JobsState IO ()
+doChdir args = do
+    maybePath <- liftIO $ case args of 
+        [] -> getEnv "HOME"
+        path : _ -> return $ Just path
+
+    let path = case maybePath of
+            Nothing -> error "Can't find $HOME environment variable"
+            Just p -> p 
+
+    liftIO $ changeWorkingDirectory path
 
 doQuit :: [String] -> StateT JobsState IO ()
 doQuit _ = do
