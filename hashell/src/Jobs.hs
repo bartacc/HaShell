@@ -10,7 +10,7 @@ import qualified Data.IntMap as IntMap
 import System.Posix
 import ProcState ( processStatusToProcState, ProcState (..), isFinished )
 import Control.Monad.IO.Class ( MonadIO(liftIO) ) 
-import Control.Monad ( guard, when )
+import Control.Monad ( guard, when, unless )
 import Control.Concurrent ( yield )
 import Control.Monad.Trans.State (StateT, put, get)
 import DebugLogger (debug)
@@ -53,26 +53,35 @@ resumeJob isBg jId sigMask = do
         let jobId = 
                 if jId < 0 then fst $ IntMap.findMax jobMap
                 else jId
+        
         let job = jobMap IntMap.! jobId
+        liftIO $ debug $ "In resumeJob. Will resume jobId=" ++ show jobId ++ " with pgid=" ++ show (pgid job)
+
+        -- Consume all pending messages from stmChan before sending our own message
+        updateStateFromChannelNonBlocking
+
+        unless isBg $ do
+            let newState = moveBGJobToFG state jobId
+            put newState
+            -- Give terminal to resumed job before sending sigCONT to avoid SIGTTIN or SIGTTOU signal
+            liftIO $ setTerminalPgid newState (pgid job)
 
         liftIO $ signalProcessGroup sigCONT $ pgid job
         liftIO $ printContinued jobId (cmdString job)
 
-        -- After sending SIGCONT, update job state to RUNNING, by sending messages through STM TChan.
-        -- Can't do that from sigchildHandler, because unix Haskell library doesn't have bindings
-        -- for WCONTINUED flag in waitpid() :/
-        let stmChan = stmChannel state
-        liftIO $ atomically $
-            mapM_
-            (writeTChan stmChan)
-            (craftUpdateProcInfo job)
+        if isBg then do
+            -- After sending SIGCONT, update job state to RUNNING, by sending messages through STM TChan.
+            -- Can't do that from sigchildHandler, because unix Haskell library doesn't have bindings
+            -- for WCONTINUED flag in waitpid() :/
+            let stmChan = stmChannel state
+            liftIO $ atomically $
+                mapM_
+                (writeTChan stmChan)
+                (craftUpdateProcInfo job)
 
-        if isBg then
             -- Makes sure that shell received SIGCHLD and that job status is updated
             waitForSigchld sigMask jobId 
         else do
-            let newState = moveBGJobToFG state jobId
-            put newState
             monitorJob sigMask
 
     where
