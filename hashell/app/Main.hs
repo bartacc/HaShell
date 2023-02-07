@@ -24,13 +24,6 @@ main = do
 
   debug $ show initialState
 
-    -- TODO: 
-    --  struct sigaction act = {
-    --    .sa_handler = sigint_handler,
-    --    .sa_flags = 0, /* without SA_RESTART read() will return EINTR */
-    --  };
-    --  Sigaction(SIGINT, &act, NULL);
-
     -- Shell should ignore SIGINT, SIGTSTP, SIGTTIN, SIGTTOU signals
   _ <- installHandler keyboardSignal Ignore Nothing
   _ <- installHandler keyboardStop Ignore Nothing
