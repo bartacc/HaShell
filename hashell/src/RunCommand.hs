@@ -240,13 +240,6 @@ duplicateRedirFds newInputFd newOutputFd =
                                 _ <- dupTo newFd origFd
                                 maybeCloseFd newFd
 
-execExternalProcess :: ProcessToRun -> IO ()
-execExternalProcess procToRun =
-        do
-                revertSignalsToDefault
-                duplicateRedirFds (inputFD procToRun) (outputFD procToRun)
-                executeFile (ProcessToRun.cmdName procToRun) True (ProcessToRun.args procToRun) Nothing
-
 
 execBuiltinOrExternalProcess :: ProcessToRun -> JobsState -> IO ()
 execBuiltinOrExternalProcess procToRun jobsState =
