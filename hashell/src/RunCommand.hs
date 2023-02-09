@@ -61,12 +61,6 @@ run (CommandToRun (SingleCommand cmdWithArgs) commandName isBg) =
                 parentAfterFork :: ProcessID -> ProcessToRun -> SignalSet -> StateT JobsState IO ()
                 parentAfterFork childPid procToRun origSigMask =
                         do
-                        -- TODO:
-                        -- if (setpgid(pid, pid) < 0 && errno != EACCES) {
-                        --       /* If errno == EACCESS, then the child process is already after exec and
-                        --        * it has pgid set */
-                        --       unix_error("Setpgid error");
-                        --     }
                         childPgid <- liftIO $ createProcessGroupFor childPid
 
                         liftIO $ debug $ "In parent after fork: childPid=" ++ show childPid ++ " childPgid=" ++ show childPgid 
